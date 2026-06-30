@@ -1,1 +1,176 @@
-# final_project_data_pipeline_bni_corpu
+# Final Project Data Pipeline — BNI Corpu
+
+Repo ini berisi materi dan hands-on project **ETL Pipeline dengan Apache Airflow v3 + PostgreSQL** menggunakan Docker Compose.
+
+---
+
+## Struktur Repo
+
+```
+.
+├── dags/                          # Airflow DAG files
+│   ├── dag_etl_bank_transactions.py
+│   ├── dag_el_churn.py
+│   └── dag_etl_customers.py
+├── include/
+│   ├── dataset/                   # Source CSV files (generate dulu, lihat langkah 4)
+│   ├── script/                    # Python ETL scripts
+│   │   ├── generate_banking_dataset.py
+│   │   └── etl_bank_transactions.py
+│   └── sql/                       # SQL transform files
+│       ├── churn/
+│       └── customers/
+├── docker-compose.yaml
+├── .env.example                   # Template environment variables
+└── requirements.txt
+```
+
+---
+
+## Cara Menjalankan di GitHub Codespace (Rekomendasi)
+
+### 1. Buka Codespace
+
+Di halaman repo GitHub, klik tombol **`Code`** → tab **`Codespaces`** → **`Create codespace on main`**.
+
+Tunggu hingga environment selesai di-setup (sekitar 1-2 menit).
+
+### 2. Setup Environment Variables
+
+```bash
+cp .env.example .env
+```
+
+Edit file `.env` sesuai kebutuhan (password bisa dibiarkan default untuk development):
+
+```bash
+# Isi minimal ini:
+AIRFLOW_UID=50000
+ETL_POSTGRES_USER=etl
+ETL_POSTGRES_PASSWORD=etl_secret   # ganti jika perlu
+ETL_POSTGRES_DB=etl_db
+ETL_POSTGRES_HOST=localhost
+ETL_POSTGRES_PORT=5433
+```
+
+### 3. Jalankan Docker Compose
+
+```bash
+# Fresh start (hapus volume lama jika ada)
+docker compose down -v
+
+# Start semua services
+docker compose up -d
+```
+
+Tunggu semua container healthy (sekitar 1-2 menit):
+
+```bash
+docker compose ps
+```
+
+Semua service harus berstatus `healthy` atau `running`.
+
+### 4. Generate Dataset
+
+```bash
+python include/script/generate_banking_dataset.py
+```
+
+Dataset akan tersimpan di `include/dataset/`.
+
+### 5. Buka Airflow UI
+
+Di panel **Ports** Codespace (tab bawah), cari port **`8082`** → klik ikon globe untuk buka di browser.
+
+- **Username**: `airflow`
+- **Password**: `airflow`
+
+### 6. Setup Airflow Connection
+
+Buka **Admin → Connections → `+`** lalu isi:
+
+| Field | Value |
+|---|---|
+| Connection ID | `postgres_etl` |
+| Connection Type | `Postgres` |
+| Host | `postgres-etl` |
+| Database | `etl_db` |
+| Login | `etl` |
+| Password | `etl_secret` |
+| Port | `5432` |
+
+Klik **Save**.
+
+### 7. Jalankan DAG
+
+1. Buka halaman **DAGs**
+2. Pilih DAG yang ingin dijalankan (misal: `dag_etl_customers`)
+3. Klik tombol **▶ Trigger DAG**
+4. Monitor eksekusi di tab **Graph** atau **Logs**
+
+---
+
+## Cara Menjalankan di Lokal (Docker Desktop)
+
+### Prasyarat
+- Docker Desktop terinstall dan berjalan
+- Python 3.8+
+
+### Langkah
+
+```bash
+# 1. Clone repo
+git clone https://github.com/saipulrx/final_project_data_pipeline_bni_corpu.git
+cd final_project_data_pipeline_bni_corpu
+
+# 2. Setup env
+cp .env.example .env
+# Edit .env jika perlu (ETL_POSTGRES_HOST=localhost, ETL_POSTGRES_PORT=5433)
+
+# 3. Jalankan
+docker compose up -d
+
+# 4. Generate dataset
+python include/script/generate_banking_dataset.py
+
+# 5. Buka Airflow di browser
+open http://localhost:8082
+```
+
+---
+
+## DAGs yang Tersedia
+
+| DAG ID | Source | Destination | Keterangan |
+|---|---|---|---|
+| `dag_etl_bank_transactions` | `bank_transactions_data_2.csv` | `trx_sample` | ETL transaksi bank |
+| `dag_el_churn` | `churn.csv` | `churn_clean` | EL + transform data churn |
+| `dag_etl_customers` | `customers.csv` | `dim_customers` | ETL dimensi customer |
+
+---
+
+## Troubleshooting
+
+**DAG tidak muncul di UI**
+```bash
+# Hapus cache DAG processor
+docker exec $(docker ps --filter "name=airflow-dag-processor" -q) \
+  sh -c "rm -rf /opt/airflow/dags/__pycache__"
+```
+
+**Koneksi lama muncul / data tidak bersih**
+```bash
+# Reset semua data (hapus volumes)
+docker compose down -v
+docker compose up -d
+```
+
+**Cek logs container**
+```bash
+docker compose logs airflow-worker --tail=50
+docker compose logs airflow-dag-processor --tail=50
+```
+
+**Port 8082 tidak bisa diakses di Codespace**  
+Pastikan visibility port di-set ke **Public**: klik kanan port `8082` di tab Ports → **Port Visibility** → **Public**.
