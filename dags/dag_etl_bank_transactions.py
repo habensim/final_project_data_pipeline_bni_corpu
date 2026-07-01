@@ -12,16 +12,37 @@ Task flow:
 Airflow Connection yang dibutuhkan:
     conn_id = "postgres_etl"  (tipe: Postgres)
     Host: postgres-etl | Port: 5432 | DB: etl_db
+
+CATATAN PERBAIKAN (lihat komentar "FIX" di bawah untuk detail):
+  1. Cek dependency `psycopg2-binary` di requirements.txt — SQLAlchemy engine
+     dengan driver "postgresql+psycopg2" akan gagal total (ModuleNotFoundError)
+     kalau package ini tidak ter-install. Ini TIDAK bisa saya perbaiki dari kode,
+     karena letaknya di requirements.txt, bukan di DAG file ini.
+  2. Ditambahkan pool_pre_ping + connect_timeout supaya kalau Postgres belum
+     fully-ready saat task start, error yang muncul lebih jelas (bukan silent
+     connection reset), dan koneksi lama yang basi tidak dipakai ulang.
+  3. Ditambahkan validasi eksplisit untuk keberadaan file CSV, dengan pesan
+     error yang menyebutkan path absolut yang dicoba — supaya kalau ini
+     penyebabnya, log langsung kasih tahu, bukan generic FileNotFoundError.
+  4. Ditambahkan logging di setiap langkah `extract` supaya saat kamu buka
+     tab Logs, kamu bisa lihat persis di baris mana proses berhenti.
+  5. TRUNCATE dipindah agar hanya jalan setelah CSV berhasil dibaca & tidak
+     kosong — supaya kalau baca CSV gagal, tabel raw yang lama tidak ikut
+     kehapus sia-sia.
 """
 
 import os
+import logging
 from datetime import datetime, timedelta
 
 import pandas as pd
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
 
 from airflow.decorators import dag, task
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+
+log = logging.getLogger(__name__)
 
 # ─── Konstanta ────────────────────────────────────────────────────────────────
 CONN_ID     = "postgres_etl"
@@ -120,29 +141,66 @@ def dag_etl_bank_transactions():
     def extract():
         from airflow.hooks.base import BaseHook
 
-        conn     = BaseHook.get_connection(CONN_ID)
+        # FIX #3: validasi path eksplisit, jangan biarkan pandas yang
+        # melempar FileNotFoundError generik.
+        abs_path = os.path.abspath(SOURCE_FILE)
+        log.info("Mencari file CSV di: %s", abs_path)
+        if not os.path.isfile(abs_path):
+            raise FileNotFoundError(
+                f"CSV tidak ditemukan di path: {abs_path}. "
+                f"Cek apakah dag_etl_bank_transactions.py ada langsung di folder "
+                f"'dags/' (bukan sub-folder), dan file dataset ada di "
+                f"'include/dataset/bank_transactions_data_2.csv'."
+            )
+
+        conn = BaseHook.get_connection(CONN_ID)
         conn_str = (
             f"postgresql+psycopg2://{conn.login}:{conn.password}"
             f"@{conn.host}:{conn.port}/{conn.schema}"
         )
-        engine = create_engine(conn_str)
 
-        df = pd.read_csv(SOURCE_FILE)
-
-        with engine.connect() as c:
-            c.execute(text("TRUNCATE TABLE trx_raw"))
-            c.commit()
-
-        df.to_sql(
-            name      = "trx_raw",
-            con       = engine,
-            if_exists = "append",
-            index     = False,
-            method    = "multi",
-            chunksize = 1000,
+        # FIX #2: pool_pre_ping mengetes koneksi sebelum dipakai (menghindari
+        # koneksi basi), dan connect_timeout memastikan kita gagal cepat
+        # dengan pesan jelas kalau Postgres belum ready, bukan hang lama.
+        engine = create_engine(
+            conn_str,
+            pool_pre_ping=True,
+            connect_args={"connect_timeout": 10},
         )
-        engine.dispose()
-        return len(df)
+
+        try:
+            log.info("Membaca CSV...")
+            df = pd.read_csv(abs_path)
+            log.info("Berhasil baca %d baris, kolom: %s", len(df), list(df.columns))
+
+            if df.empty:
+                raise ValueError("CSV terbaca tapi kosong (0 baris). Extract dibatalkan.")
+
+            # FIX #5: TRUNCATE hanya setelah CSV valid, di dalam try yang sama
+            with engine.begin() as c:  # engine.begin() auto-commit/rollback
+                log.info("Truncate trx_raw...")
+                c.execute(text("TRUNCATE TABLE trx_raw"))
+
+            log.info("Menulis ke trx_raw...")
+            df.to_sql(
+                name      = "trx_raw",
+                con       = engine,
+                if_exists = "append",
+                index     = False,
+                method    = "multi",
+                chunksize = 1000,
+            )
+            log.info("Selesai. %d baris dimuat ke trx_raw.", len(df))
+            return len(df)
+
+        except OperationalError as e:
+            log.error("Gagal konek/eksekusi ke Postgres (%s): %s", CONN_ID, e)
+            raise
+        except Exception as e:
+            log.error("Extract gagal: %s", e)
+            raise
+        finally:
+            engine.dispose()
 
     # ── Task 3: Transform trx_raw → trx_clean ────────────────────────────────
     transform = SQLExecuteQueryOperator(
