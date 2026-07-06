@@ -100,15 +100,15 @@ Di panel **Ports** Codespace (tab bawah), cari port **`8082`** → klik ikon glo
 
 Buka **Admin → Connections → `+`** lalu isi:
 
-| Field | Value |
-|---|---|
-| Connection ID | `postgres_etl(bebas terserah anda)` |
-| Connection Type | `Postgres` |
-| Host | `<lihat host di akun neon anda>` |
-| Database | `<lihat database di akun neon anda>` |
-| Login | `<lihat username di akun neon anda>` |
-| Password | `<lihat password di akun neon anda>` |
-| Port | `5432` |
+| Field           | Value                                |
+| --------------- | ------------------------------------ |
+| Connection ID   | `postgres_etl(bebas terserah anda)`  |
+| Connection Type | `Postgres`                           |
+| Host            | `<lihat host di akun neon anda>`     |
+| Database        | `<lihat database di akun neon anda>` |
+| Login           | `<lihat username di akun neon anda>` |
+| Password        | `<lihat password di akun neon anda>` |
+| Port            | `5432`                               |
 
 Klik **Save**.
 
@@ -124,6 +124,7 @@ Klik **Save**.
 ## Cara Menjalankan di Lokal (Docker Desktop)
 
 ### Prasyarat
+
 - Docker Desktop terinstall dan berjalan
 - Python 3.8+
 
@@ -152,17 +153,18 @@ open http://localhost:8082
 
 ## DAGs yang Tersedia
 
-| DAG ID | Source | Destination | Keterangan |
-|---|---|---|---|
-| `dag_etl_bank_transactions` | `bank_transactions_data_2.csv` | `trx_sample` | ETL transaksi bank |
-| `dag_el_churn` | `churn.csv` | `churn_clean` | EL + transform data churn |
-| `dag_etl_customers` | `customers.csv` | `dim_customers` | ETL dimensi customer |
+| DAG ID                      | Source                         | Destination     | Keterangan                |
+| --------------------------- | ------------------------------ | --------------- | ------------------------- |
+| `dag_etl_bank_transactions` | `bank_transactions_data_2.csv` | `trx_sample`    | ETL transaksi bank        |
+| `dag_el_churn`              | `churn.csv`                    | `churn_clean`   | EL + transform data churn |
+| `dag_etl_customers`         | `customers.csv`                | `dim_customers` | ETL dimensi customer      |
 
 ---
 
 ## Troubleshooting
 
 **DAG tidak muncul di UI**
+
 ```bash
 # Hapus cache DAG processor
 docker exec $(docker ps --filter "name=airflow-dag-processor" -q) \
@@ -170,6 +172,7 @@ docker exec $(docker ps --filter "name=airflow-dag-processor" -q) \
 ```
 
 **Koneksi lama muncul / data tidak bersih**
+
 ```bash
 # Reset semua data (hapus volumes)
 docker compose down -v
@@ -177,6 +180,7 @@ docker compose up -d
 ```
 
 **Cek logs container**
+
 ```bash
 docker compose logs airflow-worker --tail=50
 docker compose logs airflow-dag-processor --tail=50
@@ -197,12 +201,13 @@ Di bagian **Codespaces** akan terlihat compute hours dan storage yang sudah terp
 
 ### Free Quota per Bulan
 
-| Akun | Compute | Storage |
-|---|---|---|
-| Free | 120 core-hours | 15 GB |
-| Pro | 180 core-hours | 20 GB |
+| Akun | Compute        | Storage |
+| ---- | -------------- | ------- |
+| Free | 120 core-hours | 15 GB   |
+| Pro  | 180 core-hours | 20 GB   |
 
 **Catatan core-hours** — tergantung machine type:
+
 - 2-core machine → 120 core-hours = **60 jam aktif**
 - 4-core machine → 120 core-hours = **30 jam aktif**
 
@@ -213,6 +218,7 @@ Gunakan **2-core machine** untuk hemat quota (cukup untuk hands-on ini).
 > ⚠️ Jangan hanya tutup browser — Codespace tetap berjalan dan memakan quota.
 
 **Stop Codespace saat tidak dipakai:**
+
 1. Buka [https://github.com/codespaces](https://github.com/codespaces)
 2. Klik `...` di Codespace yang aktif
 3. Pilih **Stop codespace**
@@ -222,5 +228,10 @@ Atau dari dalam Codespace: tekan `Ctrl+Shift+P` → ketik `Stop Current Codespac
 Codespace otomatis stop setelah **30 menit idle**, tapi lebih baik stop manual untuk memastikan.
 
 **Hapus Codespace yang sudah tidak dipakai** untuk bebaskan storage quota:
+
 1. Buka [https://github.com/codespaces](https://github.com/codespaces)
 2. Klik `...` → **Delete**
+
+## Result Query untuk menjawab Pertanyaan Bisnis
+
+1. Buka results-query.html
