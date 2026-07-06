@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BNI Data Pipeline — Pertanyaan Bisnis &amp; Hasil</title>
+<style>
+  :root {
+    --bni-orange: #ea6410;
+    --bni-teal: #005e6a;
+    --ink: #1c2330;
+    --muted: #5b6472;
+    --line: #e2e6ec;
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --code-bg: #1c2330;
+    --code-ink: #e6edf3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.55;
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  header.report-head {
+    border-left: 6px solid var(--bni-orange);
+    padding: 8px 0 8px 20px;
+    margin-bottom: 8px;
+  }
+  header.report-head h1 { margin: 0 0 6px; font-size: 1.9rem; letter-spacing: -0.01em; }
+  header.report-head p { margin: 0; color: var(--muted); max-width: 62ch; }
+
+  section.qsection {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 26px 28px;
+    margin: 28px 0;
+  }
+  section.qsection > h2 {
+    margin: 0 0 4px;
+    font-size: 1.3rem;
+    color: var(--bni-teal);
+  }
+  section.qsection > h2 .num {
+    display: inline-block;
+    background: var(--bni-orange);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+  h3.sub { margin: 26px 0 10px; font-size: 1.02rem; color: var(--ink); }
+
+  blockquote.question {
+    margin: 14px 0 18px;
+    padding: 14px 16px;
+    background: #fff7f1;
+    border-left: 4px solid var(--bni-orange);
+    border-radius: 0 8px 8px 0;
+  }
+  blockquote.question p { margin: 0 0 6px; }
+  blockquote.question p:last-child { margin-bottom: 0; }
+  blockquote.question .tables { color: var(--muted); font-size: 0.9rem; }
+
+  p.note { color: var(--muted); font-size: 0.95rem; }
+
+  .code-wrap { overflow-x: auto; border-radius: 8px; margin: 8px 0 4px; }
+  pre {
+    margin: 0;
+    background: var(--code-bg);
+    color: var(--code-ink);
+    padding: 16px 18px;
+    font-size: 0.86rem;
+    line-height: 1.5;
+    font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  }
+  pre code { white-space: pre; }
+  code.inline {
+    background: #eef1f4;
+    color: var(--bni-teal);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.88em;
+    font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  }
+
+  .table-wrap { overflow-x: auto; margin: 8px 0 18px; }
+  table.grid { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  table.grid th, table.grid td {
+    border: 1px solid var(--line);
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  table.grid th { background: #f0f2f5; font-weight: 600; }
+
+  /* Image placeholder / result figure */
+  figure.result {
+    margin: 14px 0 6px;
+    border: 2px dashed #c3ccd6;
+    border-radius: 10px;
+    background: repeating-linear-gradient(45deg, #fafbfc, #fafbfc 12px, #f2f4f7 12px, #f2f4f7 24px);
+    padding: 16px;
+    text-align: center;
+  }
+  figure.result img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+    border-radius: 6px;
+  }
+
+  figure.result img:not([src]),
+  figure.result img[src=""] { display: none; }
+  figure.result figcaption {
+    margin-top: 10px;
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  figure.result figcaption::before { content: "🖼  "; font-style: normal; }
+
+  ul.tight { margin: 6px 0 0; padding-left: 20px; }
+  ul.tight li { margin: 3px 0; }
+
+  footer.report-foot {
+    margin-top: 34px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  hr.sep { border: none; border-top: 1px solid var(--line); margin: 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="report-head">
+    <h1>BNI Data Pipeline — Pertanyaan Bisnis &amp; SQL Jawaban</h1>
+    <p>Dokumen ini menjawab 6 dashboard bisnis dengan SQL siap-jalan terhadap star schema</p>
+  </header>
+
+  <!-- 01 -->
+  <section class="qsection">
+    <h2><span class="num">01</span>Transaction Analytics</h2>
+    <blockquote class="question">
+      <p><strong>Berapa total volume dan nilai transaksi per hari, minggu, dan bulan? Apa tren pertumbuhannya?</strong></p>
+      <p class="tables">Tabel: <code class="inline">dim_date</code> · <code class="inline">dim_channel</code> · <code class="inline">fact_transactions</code></p>
+    </blockquote>
+
+    <h3 class="sub">(a) Harian — volume, nilai, dan % pertumbuhan harian (day-over-day)</h3>
+    <div class="code-wrap"><pre><code>SELECT d.full_date,
+       COUNT(*)      AS txn_volume,
+       SUM(f.amount) AS txn_value,
+       ROUND(100.0 * (SUM(f.amount) - LAG(SUM(f.amount)) OVER (ORDER BY d.full_date))
+             / NULLIF(LAG(SUM(f.amount)) OVER (ORDER BY d.full_date), 0), 2) AS dod_growth_pct
+FROM transactions_sample f
+JOIN dim_date_full d ON d.date_id = TO_CHAR(f.transaction_date, 'YYYYMMDD')::INT
+WHERE f.status = 'SUCCESS'
+GROUP BY d.full_date
+ORDER BY d.full_date;</code></pre></div>
+    <figure class="result">
+      <img src="assets/q01a-daily-trend.png" alt="01a · Volume, nilai & pertumbuhan harian" />
+      <figcaption>Tren Pertumbuhan: volume, nilai, dan % pertumbuhan harian (day-over-day)</figcaption>
+    </figure>
+
+    <h3 class="sub">(b) Mingguan — volume, nilai, dan % pertumbuhan mingguan (week-over-week)</h3>
+    <div class="code-wrap"><pre><code>SELECT d.year, d.week_of_year,
+       COUNT(*)      AS txn_volume,
+       SUM(f.amount) AS txn_value,
+       ROUND(100.0 * (SUM(f.amount) - LAG(SUM(f.amount)) OVER (ORDER BY d.year, d.week_of_year))
+             / NULLIF(LAG(SUM(f.amount)) OVER (ORDER BY d.year, d.week_of_year), 0), 2) AS wow_growth_pct
+FROM transactions_sample f
+JOIN dim_date_full d ON d.date_id = TO_CHAR(f.transaction_date, 'YYYYMMDD')::INT
+WHERE f.status = 'SUCCESS'
+GROUP BY d.year, d.week_of_year
+ORDER BY d.year, d.week_of_year;</code></pre></div>
+    <figure class="result">
+      <img src="assets/q01b-weekly-trend.png" alt="01b · Volume, nilai & pertumbuhan mingguan" />
+      <figcaption>Tren Pertumbuhan: volume, nilai, dan % pertumbuhan mingguan (week-over-week)</figcaption>
+    </figure>
+
+    <h3 class="sub">(c) Bulanan — volume, nilai, dan % pertumbuhan bulanan (month-over-month)</h3>
+    <div class="code-wrap"><pre><code>SELECT d.year, d.month, d.month_name,
+       COUNT(*)      AS txn_volume,
+       SUM(f.amount) AS txn_value,
+       ROUND(100.0 * (SUM(f.amount) - LAG(SUM(f.amount)) OVER (ORDER BY d.year, d.month))
+             / NULLIF(LAG(SUM(f.amount)) OVER (ORDER BY d.year, d.month), 0), 2) AS mom_growth_pct
+FROM transactions_sample f
+JOIN dim_date_full d ON d.date_id = TO_CHAR(f.transaction_date, 'YYYYMMDD')::INT
+WHERE f.status = 'SUCCESS'
+GROUP BY d.year, d.month, d.month_name
+ORDER BY d.year, d.month;</code></pre></div>
+    <figure class="result">
+      <img src="assets/q01c-monthly-trend.png" alt="01c · Volume, nilai & pertumbuhan bulanan" />
+      <figcaption>Tren Pertumbuhan: volume, nilai, dan % pertumbuhan bulanan (month-over-month)</figcaption>
+    </figure>
+  </section>
+
+  <!-- 02 -->
+  <section class="qsection">
+    <h2><span class="num">02</span>Customer 360</h2>
+    <blockquote class="question">
+      <p><strong>Siapa nasabah paling aktif berdasarkan frekuensi dan nilai transaksi? Bagaimana distribusi per segmen (Retail/Priority/VIP)?</strong></p>
+      <p class="tables">Tabel: <code class="inline">dim_customer</code> · <code class="inline">dim_account</code> · <code class="inline">fact_transactions</code></p>
+    </blockquote>
+
+    <h3 class="sub">(a) Nasabah paling aktif — berdasarkan frekuensi dan nilai</h3>
+    <div class="code-wrap"><pre><code>SELECT cu.customer_id, cu.full_name, cu.segment,
+       COUNT(*)      AS txn_freq,
+       SUM(f.amount) AS txn_value
+FROM transactions_sample f
+JOIN dim_customers cu ON cu.customer_id = f.customer_id
+WHERE f.status = 'SUCCESS'
+GROUP BY cu.customer_id, cu.full_name, cu.segment
+ORDER BY txn_value DESC
+LIMIT 20;</code></pre></div>
+    <figure class="result">
+      <img src="assets/q02a-active-customers.png" alt="02a · 20 nasabah paling aktif" />
+      <figcaption>Hasil: 20 nasabah teratas berdasarkan frekuensi dan nilai transaksi</figcaption>
+    </figure>
+
+    <h3 class="sub">(b) Distribusi per segmen (Retail / Priority / VIP)</h3>
+    <div class="code-wrap"><pre><code>SELECT cu.segment,
+       COUNT(DISTINCT cu.customer_id) AS n_customers,
+       COUNT(*)                       AS txn_freq,
+       SUM(f.amount)                  AS txn_value,
+       ROUND(AVG(f.amount), 2)        AS avg_txn
+FROM transactions_sample f
+JOIN dim_customers cu ON cu.customer_id = f.customer_id
+WHERE f.status = 'SUCCESS'
+GROUP BY cu.segment
+ORDER BY txn_value DESC;</code></pre></div>
+    <figure class="result">
+      <img src="assets/q02b-segment-distribution.png" alt="02b · Distribusi per segmen" />
+      <figcaption>Hasil: jumlah nasabah, frekuensi, nilai, dan rata-rata per segmen</figcaption>
+    </figure>
+  </section>
+
+  <!-- 03 -->
+  <section class="qsection">
+    <h2><span class="num">03</span>Branch Performance</h2>
+    <blockquote class="question">
+      <p><strong>Cabang mana yang memiliki performa tertinggi berdasarkan jumlah transaksi dan total nilai transaksi per region?</strong></p>
+      <p class="tables">Tabel: <code class="inline">dim_branch</code> · <code class="inline">dim_date</code> · <code class="inline">fact_transactions</code></p>
+    </blockquote>
+
+    <h3 class="sub">Peringkat cabang dalam tiap region <span style="font-weight:400;color:var(--muted);">(cabang teratas per region = <code class="inline">rank_in_region = 1</code>)</span></h3>
+    <div class="code-wrap"><pre><code>SELECT b.region, b.branch_name,
+       COUNT(*)      AS txn_count,
+       SUM(f.amount) AS txn_value,
+       RANK() OVER (PARTITION BY b.region ORDER BY SUM(f.amount) DESC) AS rank_in_region
+FROM transactions_sample f
+JOIN dim_branches b ON b.branch_id = f.branch_id
+WHERE f.status = 'SUCCESS'
+GROUP BY b.region, b.branch_name
+ORDER BY b.region, txn_value DESC;</code></pre></div>
+    <figure class="result">
+      <img src="assets/q03a-branch-ranking.png" alt="03a · Peringkat cabang dalam tiap region" />
+      <figcaption>Hasil: peringkat cabang dalam tiap region berdasarkan nilai transaksi</figcaption>
+    </figure>
+
+  </section>
+
+  <!-- 04 -->
+  <section class="qsection">
+    <h2><span class="num">04</span>Channel Analysis</h2>
+    <blockquote class="question">
+      <p><strong>Channel apa yang paling banyak digunakan nasabah (ATM, Mobile, Teller, Internet Banking)? Bagaimana tren migrasi ke digital?</strong></p>
+      <p class="tables">Tabel: <code class="inline">dim_channel</code> · <code class="inline">dim_date</code> · <code class="inline">fact_transactions</code></p>
+    </blockquote>
+
+    <h3 class="sub">(a) Penggunaan channel — porsi dari total transaksi</h3>
+    <div class="code-wrap"><pre><code>SELECT c.channel_name, c.is_digital,
+       COUNT(*)      AS txn_count,
+       SUM(f.amount) AS txn_value,
+       ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS pct_of_txn
+FROM transactions_sample f
+JOIN dim_channels c ON c.channel_id = f.channel_id
+WHERE f.status = 'SUCCESS'
+GROUP BY c.channel_name, c.is_digital
+ORDER BY txn_count DESC;</code></pre></div>
+    <figure class="result">
+      <img src="assets/q04a-channel-usage.png" alt="04a · Porsi penggunaan channel" />
+      <figcaption>Hasil: jumlah transaksi, nilai, dan % porsi per channel</figcaption>
+    </figure>
+
+    <h3 class="sub">(b) Tren migrasi digital — porsi transaksi digital per bulan</h3>
+    <div class="code-wrap"><pre><code>SELECT d.year, d.month, d.month_name,
+       COUNT(*) FILTER (WHERE c.is_digital) AS digital_txn,
+       COUNT(*)                             AS total_txn,
+       ROUND(100.0 * COUNT(*) FILTER (WHERE c.is_digital) / COUNT(*), 2) AS digital_share_pct
+FROM transactions_sample f
+JOIN dim_channels c   ON c.channel_id = f.channel_id
+JOIN dim_date_full d  ON d.date_id = TO_CHAR(f.transaction_date, 'YYYYMMDD')::INT
+WHERE f.status = 'SUCCESS'
+GROUP BY d.year, d.month, d.month_name
+ORDER BY d.year, d.month;</code></pre></div>
+    <figure class="result">
+      <img src="assets/q04b-digital-migration.png" alt="04b · Tren migrasi digital" />
+      <figcaption>Hasil: porsi transaksi digital per bulan dari waktu ke waktu</figcaption>
+    </figure>
+  </section>
+
+  <!-- 05 -->
+  <section class="qsection">
+    <h2><span class="num">05</span>Product Performance</h2>
+    <blockquote class="question">
+      <p><strong>Produk rekening mana (Tabungan/Giro/Deposito) yang menghasilkan volume transaksi dan saldo rata-rata tertinggi?</strong></p>
+      <p class="tables">Tabel: <code class="inline">dim_account</code> · <code class="inline">dim_date</code> · <code class="inline">fact_transactions</code></p>
+    </blockquote>
+
+    <h3 class="sub">Per produk — volume transaksi, nilai, dan saldo rata-rata (<code class="inline">balance_after</code>)</h3>
+    <div class="code-wrap"><pre><code>SELECT a.account_type, a.product_name,
+       COUNT(*)                    AS txn_volume,
+       SUM(f.amount)               AS txn_value,
+       ROUND(AVG(f.balance_after), 2) AS avg_balance
+FROM transactions_sample f
+JOIN dim_accounts a ON a.account_id = f.account_id
+WHERE f.status = 'SUCCESS'
+GROUP BY a.account_type, a.product_name
+ORDER BY txn_volume DESC;</code></pre></div>
+    <figure class="result">
+      <img src="assets/q05a-product-detail.png" alt="05a · Performa per produk" />
+      <figcaption>Hasil: volume, nilai, dan saldo rata-rata per produk</figcaption>
+    </figure>
+
+  </section>
+
+  <!-- 06 -->
+  <section class="qsection">
+    <h2><span class="num">06</span>Risk &amp; Fraud Detection</h2>
+    <blockquote class="question">
+      <p><strong>Adakah transaksi anomali (nilai sangat besar, frekuensi tidak wajar, atau status FAILED berulang) yang perlu diwaspadai?</strong></p>
+      <p class="tables">Tabel: <code class="inline">dim_customer</code> · <code class="inline">dim_channel</code> · <code class="inline">fact_transactions</code> <em>(+ <code class="inline">fraud_labels_sample</code>)</em></p>
+    </blockquote>
+
+    <h3 class="sub">FAILED berulang per nasabah — 3 atau lebih transaksi gagal</h3>
+    <div class="code-wrap"><pre><code>SELECT cu.customer_id, cu.full_name, cu.segment,
+       COUNT(*) AS failed_count
+FROM transactions_sample f
+JOIN dim_customers cu ON cu.customer_id = f.customer_id
+WHERE f.status = 'FAILED'
+GROUP BY cu.customer_id, cu.full_name, cu.segment
+HAVING COUNT(*) >= 3
+ORDER BY failed_count DESC;</code></pre></div>
+    <figure class="result">
+      <img src="assets/q06b-repeated-failed.png" alt="06b · FAILED berulang per nasabah" />
+      <figcaption>Hasil: nasabah dengan 3+ transaksi gagal</figcaption>
+    </figure>
+
+  </section>
+
+</div>
+</body>
+</html>
